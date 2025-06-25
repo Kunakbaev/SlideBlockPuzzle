@@ -37,6 +37,7 @@ class TerminalBgStyles(StrEnum):
 
 def getBlockColorStyle(blockInd) -> str:
     backgroundCode = 0
+    origBlockInd = blockInd
     # we iterate through colors in reverse order,
     # as we want bright and pretty colors to go first
     if blockInd == HIGHLIGHTED_BLOCK_IND: # that's a goal block
@@ -53,7 +54,8 @@ def getBlockColorStyle(blockInd) -> str:
         # first eight are bright and last eight are normal, so we subtract difference
         backgroundCode -= (blockInd >= 8) * (100 - 40)
 
-    return f"\x1b[1;39;{backgroundCode}m " + TerminalBgStyles.NORMAL
+    text = str(origBlockInd)[-1] if origBlockInd != 0 else " "
+    return f"\x1b[1;30;{backgroundCode}m{text}" + TerminalBgStyles.NORMAL
 
 def clearTerminal():
     print("\x1b[2J\x1b[H", end="", flush=True)
@@ -73,5 +75,5 @@ def restoreCursorPos():
 def replacePrevLineWithMsg(msg, addSep=True):
     print("\x1b[F",  end="") # move cursor one line up
     print("\x1b[2K", end="") # completely clear previous line
-    sys.stdout.flush()
     print(msg, end=". " if addSep else "")
+    sys.stdout.flush()

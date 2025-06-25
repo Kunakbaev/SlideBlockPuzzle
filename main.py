@@ -1,5 +1,7 @@
 from terminalScreen import clearTerminal
 from inputInitialBoardState.inputInitialBoardState import readInitialBoardState
+from boardSolver import BoardSolver
+from copy import deepcopy
 
 if __name__ == "__main__":
     # print("Available colors:")
@@ -36,6 +38,22 @@ if __name__ == "__main__":
 
     clearTerminal()
     initialBoardState = readInitialBoardState()
+    clearTerminal()
+    initialBoardState.displayBoardState()
+
+    # isFinalState = initialBoardState.isFinalState()
+    # print(isFinalState)
+
+    # cop = deepcopy(initialBoardState)
+    # cop.board[0][0] = 0
+    # cop.board[0][0] = 2
+    # print(f"InitialBoard: hash={initialBoardState.__hash__()}")
+    # print(f"copy        : hash={cop.__hash__()}")
+    # print("Are they equal : ", cop == initialBoardState)
+    # exit(0)
+
+    boardSolver = BoardSolver(initialBoardState)
+    boardSolver.solveTheBoard()
 
 
     #initialBoardState.displayBoardState(10, TerminalColor.RED)

@@ -1,7 +1,26 @@
 import sys
 from enum import Enum
+
 from terminalScreen import TerminalBgStyles, getBlockColorStyle, moveCursorToPos
 from boardState.constants import *
+from hashlib import sha256
+from json import dumps
+
+
+def getNumberSign(num):
+    if num < 0:
+        return -1
+    return num > 0
+
+
+def getDirectionBy2Cells(
+    row1, col1,
+    row2, col2
+):
+    deltaRow = getNumberSign(row2 - row1)
+    deltaCol = getNumberSign(col2 - col1)
+    return deltaRow, deltaCol
+
 
 class BoardState:
     def __init__(self, width, height, escGatePerimeterInd, goalBlockInd):
@@ -12,36 +31,79 @@ class BoardState:
         self.escGatePerimeterInd = escGatePerimeterInd
         self.goalBlockInd        = goalBlockInd
 
+    def isCellPosValid(self, rowInd, colInd):
+        if 0 <= min(rowInd, colInd) and \
+           rowInd < self.height     and \
+           colInd < self.width:
+            return True
+        return False
+
     # adds block with one side len equal to one and other equal to passed parameter
-    # (rowPos, colPos) - position of top left corner of rectangle
+    # (row, col) - position of top left corner of rectangle
     def addBlock(self, block) -> None:
-        print(BlockTraverseDir.DIRECTION_DOWN.value)
-        dx, dy = BlockTraverseDir.DIRECTION_DOWN.value
+        deltaRow, deltaCol = BlockTraverseDir.DIRECTION_DOWN.value
         if block.isHorizontal:
-            dx, dy = BlockTraverseDir.DIRECTION_RIGHT.value
+            deltaRow, deltaCol = BlockTraverseDir.DIRECTION_RIGHT.value
 
         self.numberOfBlocks += 1
-        rowPos = block.rowPos
-        colPos = block.colPos
+        row = block.rowPos
+        col = block.colPos
         for _ in range(block.sideLen):
-            if min(rowPos, colPos) < 0 or \
-               rowPos >= self.height   or \
-               colPos >= self.width: # check if cell position is valid
+            if not self.isCellPosValid(row, col): # check if cell position is valid
                 print(BLOCK_DSNT_FIT_ERR_MSG)
                 assert False
 
-            self.board[rowPos][colPos] = self.numberOfBlocks
-            rowPos += dy
-            colPos += dx
+            self.board[row][col] = self.numberOfBlocks
+            row += deltaRow
+            col += deltaCol
 
-    def isFinalState(self, gatePerimeterInd, goalBlockInd) -> bool:
-        pass
+    def getGateIndCellCoords(self):
+        ind = self.escGatePerimeterInd
+        bound = self.width + self.height + 3
+        if ind >= bound:
+            ind = ind - bound
+            row = min(self.height + self.width - ind + 1, self.height)
+            col = max(self.width - ind, 0)
+            return row, col
+        else:
+            row = max(ind - self.width - 1, 0)
+            col = min(ind, self.width + 1)
+            return row, col
+
+
+    def isFinalState(self) -> bool:
+        gateRow, gateCol = self.getGateIndCellCoords()
+        row, col = 0, 0
+        for row in range(self.height):
+            wasBreak = False
+            for col in range(self.width):
+                if self.board[row][col] == self.goalBlockInd:
+                    wasBreak = True
+                    break
+            if wasBreak:
+                break
+        #print(f"row : {row}, col : {col}, gateRow : {gateRow}, gateCol : {gateCol}")
+        row += 1
+        col += 1
+
+        deltaRow, deltaCol = getDirectionBy2Cells(row, col, gateRow, gateCol)
+        #print(deltaRow, deltaCol)
+        while self.isCellPosValid(row - 1, col - 1):
+            #print("row, col : ", row, col)
+            blockInd = self.board[row - 1][col - 1]
+            if blockInd not in (EMPTY_CELL_BLOCK_IND, self.goalBlockInd):
+                return False
+
+            row += deltaRow
+            col += deltaCol
+
+        return row == gateRow and col == gateCol
+
+
 
     def getBgStyleForCell(self, rowInd, colInd):
         # cell is inside board and not on the edge
-        if 1 <= min(rowInd, colInd) and \
-           rowInd <= self.height    and \
-           colInd <= self.width:
+        if self.isCellPosValid(rowInd - 1, colInd - 1):
             blockInd = int(self.board[rowInd - 1][colInd - 1])
             # print(rowInd, colInd, blockInd)
             blockColorStyle = getBlockColorStyle(blockInd)
@@ -83,3 +145,21 @@ class BoardState:
                 print(blockColorStyle * 2, end='')
             print()
         print()
+
+    def __hash__(self):
+        # we use this function only in BFS algo, so basically we don't care about
+        # width, height, numberOfBlocks, escGatePerimeterInd, goalBlockInd as they are invariant and
+        # same for all boards that we can reach from initial one
+        # so we just need to hash matrix of strings
+
+        data = dumps(self.board, sort_keys=True).encode("utf-8")
+        # return sha256(data).hexdigest()
+        hashBytes = sha256(data).digest()
+        # we truncate this number to only 64-bit integer
+        hash = int.from_bytes(hashBytes[:8], byteorder="big")
+        return hash
+
+
+    def __eq__(self, other):
+        return isinstance(other, BoardState) and \
+               self.board == other.board

@@ -1,12 +1,13 @@
-
 from enum import Enum, StrEnum
 from copy import deepcopy
 import sys
-from boardState.boardState import BoardState, HIGHLIGHTED_BLOCK_IND
+from boardState.boardState import BoardState
+from boardState.constants  import HIGHLIGHTED_BLOCK_IND
 from terminalScreen import replacePrevLineWithMsg, saveCursorPos, restoreCursorPos, clearTerminal
 from blockStruct import Block, BlockDirs
 from boardSideTypes import *
 from inputInitialBoardState.constants import *
+
 
 # returns string repr of error if word is not natural number, or it's too big
 # otherwise returns int(word)
@@ -21,6 +22,7 @@ def tryToReadNaturalNum(word) -> (int, str):
         return -1, ReadNaturalNumFuncErrMsgs.NUMBER_TOO_BIG
     return number, ReadNaturalNumFuncErrMsgs.ALL_FINE_MSG
 
+
 def readIntegerSafely(message) -> int:
     number = -1
     while True:
@@ -33,6 +35,7 @@ def readIntegerSafely(message) -> int:
         replacePrevLineWithMsg(err)
 
     return number
+
 
 def readExitGatePos(width, height) -> int:
     print(InputPrompts.EXIT_GATE_HELP_MSG)
@@ -76,6 +79,7 @@ def readExitGatePos(width, height) -> int:
     assert ind != -1
     return ind
 
+
 def readInitialBoardConfiguration() -> BoardState:
     width  = readIntegerSafely(InputPrompts.BOARD_WIDTH_INPUT_PROMPT)
     height = readIntegerSafely(InputPrompts.BOARD_HEIGHT_INPUT_PROMPT)
@@ -83,6 +87,7 @@ def readInitialBoardConfiguration() -> BoardState:
 
     initialBoard = BoardState(width, height, gatePerimeterInd, HIGHLIGHTED_BLOCK_IND)
     return initialBoard
+
 
 # asks user to input new blocks configuration
 # repeats this process until configuration is correct or there are no blocks to input
@@ -106,17 +111,19 @@ def readAndAddNewBlock(initialBoard) -> BlockReadState:
             replacePrevLineWithMsg(ReadNewBlockFuncErrMsgs.INVALID_NUM_OF_ARGS)
             continue
 
-        xWord, yWord, blockDir, sideLenWord = line.split(' ')
-        x, err = tryToReadNaturalNum(xWord)
+        colWord, rowWord, blockDir, sideLenWord = line.split(' ')
+        col, err = tryToReadNaturalNum(colWord)
         if err != ReadNaturalNumFuncErrMsgs.ALL_FINE_MSG:
             replacePrevLineWithMsg(err)
             continue
-        y, err = tryToReadNaturalNum(yWord)
+        row, err = tryToReadNaturalNum(rowWord)
         if err != ReadNaturalNumFuncErrMsgs.ALL_FINE_MSG:
             replacePrevLineWithMsg(err)
             continue
+        row -= 1
+        col -= 1
 
-        if min(x, y) <= 0 or x > width or y > height:
+        if not initialBoard.isCellPosValid(row , col):
             replacePrevLineWithMsg(ReadNewBlockFuncErrMsgs.INVALID_COORDS)
             continue
 
@@ -128,12 +135,15 @@ def readAndAddNewBlock(initialBoard) -> BlockReadState:
         sideLen, err = tryToReadNaturalNum(sideLenWord)
         if err != ReadNaturalNumFuncErrMsgs.ALL_FINE_MSG:
             replacePrevLineWithMsg(err)
-        if (blockDir == BlockDirs.HORIZONTAL and x + sideLen - 1 > width) or \
-           (blockDir == BlockDirs.VERTICAL   and y + sideLen - 1 > height):
+        if (blockDir == BlockDirs.HORIZONTAL and col + sideLen - 1 > width) or \
+           (blockDir == BlockDirs.VERTICAL   and row + sideLen - 1 > height):
                 replacePrevLineWithMsg(ReadNewBlockFuncErrMsgs.BLOCK_DSNT_FIT)
                 continue
 
-        block = Block(y - 1, x - 1, blockDir == BlockDirs.HORIZONTAL, sideLen)
+        block = Block(
+            row, col, blockDir == BlockDirs.HORIZONTAL, sideLen,
+            initialBoard.numberOfBlocks + 1
+        )
         initialBoard.addBlock(block)
         break
 
@@ -154,6 +164,7 @@ def updateBoardImage(oldBoard, newBoard) -> None:
             # matrix value is already up to date, but we need to update screen
             newBoard.updateCellAndRedrawIt(rowInd, colInd, new)
     restoreCursorPos()
+
 
 def readInitialBoardState() -> BoardState:
     while True:
@@ -182,7 +193,6 @@ def readInitialBoardState() -> BoardState:
         if not isFirstIteration:
             # we don't want to stack input message, so we replace previous one
             replacePrevLineWithMsg("", addSep=False) # this actually just clears previous line
-            sys.stdout.flush()
         isFirstIteration = False
 
         initialBoard = deepcopy(historyOfBoards[-1])
