@@ -5,8 +5,10 @@ from boardState.constants import EMPTY_CELL_BLOCK_IND
 from enum import Enum
 from collections import deque
 from blockStruct import Block, BlockDirs
-from terminalScreen import clearTerminal
-
+from terminalScreen import clearTerminal, saveCursorPos, restoreCursorPos
+from inputInitialBoardState.inputInitialBoardState import updateBoardImage
+import time
+import curses
 
 class Directions(Enum):
     Up    = (-1,  0)
@@ -28,39 +30,46 @@ class Move:
         self.direction = direction
         self.step      = step
 
-def isBlockInCell(board, rowInd, colInd, blockInd) -> bool:
+def isBlockIndInCell(board, rowInd, colInd, blockInd) -> bool:
     # if out of board's bound or cell is empty, then there's no block in this cell
-    blockInCell = board.board[rowInd][colInd]
-    if not board.isCellPosValid(rowInd, colInd) or \
-       blockInCell == EMPTY_CELL_BLOCK_IND:
-            return False
-
-    return blockInCell == blockInd
+    if not board.isCellPosValid(rowInd, colInd):
+        return False
+    return board.board[rowInd][colInd] == blockInd
 
 
 # returns direction, BlockDirs field: 'h' or 'v'
 def getBlockDirection(board, rowInd, colInd, blockInd) -> str:
     # just in case checking that cell is valid
-    assert isBlockInCell(board, rowInd, colInd, blockInd)
+    assert isBlockIndInCell(board, rowInd, colInd, blockInd)
 
-    if isBlockInCell(board, rowInd - 1, colInd, blockInd) or \
-       isBlockInCell(board, rowInd + 1, colInd, blockInd):
+    if isBlockIndInCell(board, rowInd - 1, colInd, blockInd) or \
+       isBlockIndInCell(board, rowInd + 1, colInd, blockInd):
             return BlockDirs.VERTICAL
     return BlockDirs.HORIZONTAL
 
 
-def markBlockCellsAsVisited(
-    board, row, col, blockInd, deltaRow, deltaCol, isVisited
-) -> (int, int):
-    isVisited[row][col] = True
-    # moving while we are inside board, and it's still our block
-    while board.isCellPosValid(row + deltaRow, col + deltaCol) and \
-          board.board[row + deltaRow][col + deltaCol] == blockInd:
+def getCellsInBlock(board, blockInd) -> list[tuple[int, int]]:
+    row, col = board.getBlockTopLeftCornerPos(blockInd)
+    dir = getBlockDirection(board, row, col, blockInd)
+    deltaRow, deltaCol = (Directions.Down if (dir == BlockDirs.VERTICAL) else Directions.Right).value
+
+    cells = []
+    while board.isCellPosValid(row, col) and \
+          board.board[row][col] == blockInd:
+        cells.append((row, col))
         row += deltaRow
         col += deltaCol
+    return cells
+
+
+def markBlockCellsAsVisited(
+    board, blockInd, isVisited
+) -> (int, int):
+    cells = getCellsInBlock(board, blockInd)
+    for (row, col) in cells:
         assert not isVisited[row][col]
         isVisited[row][col] = True
-    return row, col
+    return cells[-1]
 
 
 def addNeighbsOfBoardToQueue(
@@ -87,13 +96,18 @@ def addNeighbsOfBoardToQueue(
             #     block.blockInd, getDirectionByDeltas(dx, dy), movStep
             # )
             previousMove4Board[pushableBoard] = Move(
-                block.blockInd, (deltaRow, deltaCol), movStep
+                block.blockInd, (-deltaRow, -deltaCol), movStep
             )
             queue.append(pushableBoard)
 
 
+def waitForAnyKey():
+    input("Print enter to continue: ")
+
+
 class BoardSolver:
     def __init__(self, initialState):
+        self.boardsHistory    = []
         self.movesHistory     = []
         self.width            = initialState.width
         self.height           = initialState.height
@@ -118,12 +132,10 @@ class BoardSolver:
                 # top left corner is already found because of
                 # how this 2 loops iterate through cells: from top to bottom and from left to right
                 # to find block len we need to go either down or right
-                deltaRow, deltaCol = (Directions.Down if (dir == BlockDirs.VERTICAL) else Directions.Right).value
-                #print(f"blockInd: {blockInd}, deltaRow: {deltaRow}, deltaCol: {deltaCol}, dir: {dir}")
 
                 # moving in opposite direction
                 row2, col2 = markBlockCellsAsVisited(
-                    board, row, col, blockInd, deltaRow, deltaCol, isVisited
+                    board, blockInd, isVisited
                 )
                 #print(row, col, row2, col2)
                 sideLen = abs(row2 - row) + abs(col2 - col) + 1
@@ -133,6 +145,74 @@ class BoardSolver:
                 blocks.append(block)
 
         return blocks
+
+
+    def restoreHistoryOfBoards(self, previousMove4Board):
+        curBoard = deepcopy(self.finalBoardState)
+        while curBoard != self.initialState:
+            # print("curBoard:")
+            # curBoard.displayBoardState()
+
+            move = previousMove4Board[curBoard]
+            self.boardsHistory.append(deepcopy(curBoard))
+            self.movesHistory.append(deepcopy(move))
+            blockInd = move.blockInd
+            cells = getCellsInBlock(curBoard, blockInd)
+            for row, col in cells:
+                curBoard.board[row][col] = EMPTY_CELL_BLOCK_IND
+
+            #print(f"row : {rowCop}, col : {colCop}, sideLen : {sideLen}, dir : {dir}, blockInd : {blockInd}, deltaRow : {deltaRow}, deltaCol : {deltaCol}")
+
+            deltaRow = move.direction[0] * move.step
+            deltaCol = move.direction[1] * move.step
+            newBlock = Block(
+                cells[0][0] + deltaRow,
+                cells[0][1] + deltaCol,
+                cells[0][0] == cells[-1][0],
+                len(cells), blockInd
+            )
+            # curBoard.displayBoardState()
+            # print(newBlock.blockInd, blockInd)
+            assert curBoard.try2AddBlock(newBlock)
+            # curBoard.displayBoardState()
+            # exit(0)
+
+        self.boardsHistory.append(deepcopy(self.initialState))
+        # reverse the array
+        self.boardsHistory = self.boardsHistory[::-1]
+        self.movesHistory  = self.movesHistory [::-1]
+
+
+    def replayHistoryOfBoards(self):
+        # +1 move, because you also need to swipe highlighted block out of the puzzle
+        print(f"There are {len(self.movesHistory) + 1} moves in the most optimal solution.")
+        print(f"Now, watch carefully at the board and repeat the moves.")
+        waitForAnyKey()
+
+        clearTerminal()
+        self.boardsHistory[0].displayBoardState()
+        for i in range(len(self.boardsHistory) - 1):
+            blockInd = self.movesHistory[i].blockInd
+            cells = getCellsInBlock(self.boardsHistory[i], blockInd)
+
+            BLINK_DELAY = 0.5
+            time.sleep(BLINK_DELAY)
+            for _ in range(2):
+                saveCursorPos()
+                for row, col in cells:
+                    self.boardsHistory[i].updateCellAndRedrawIt(row, col, EMPTY_CELL_BLOCK_IND)
+                restoreCursorPos()
+                time.sleep(BLINK_DELAY)
+
+                saveCursorPos()
+                for row, col in cells:
+                    self.boardsHistory[i].updateCellAndRedrawIt(row, col, blockInd)
+                restoreCursorPos()
+                time.sleep(BLINK_DELAY)
+
+            time.sleep(BLINK_DELAY)
+            updateBoardImage(self.boardsHistory[i],
+                             self.boardsHistory[i + 1])
 
 
     def solveTheBoard(self):
@@ -148,9 +228,16 @@ class BoardSolver:
             blocks = self.findBlocks4Board(curBoard)
             #print("previousMove4Board: ", len(previousMove4Board))
 
+            # curBoard.displayBoardState()
+            # if curBoard != self.initialState:
+            #     continue
+
             if curBoard.isFinalState():
-                curBoard.displayBoardState()
-                exit(0)
+                print("Successfully solved puzzle! :)")
+                #curBoard.displayBoardState()
+                self.finalBoardState = deepcopy(curBoard)
+                self.restoreHistoryOfBoards(previousMove4Board)
+                break
 
             # if len(previousMove4Board) > 5:
             #     bruh = []
@@ -179,3 +266,6 @@ class BoardSolver:
                     previousMove4Board, queue
                 )
             #exit(0)
+        else:
+            print("Puzzle is unsolvable :(\n")
+            exit(0)

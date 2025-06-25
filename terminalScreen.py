@@ -1,6 +1,6 @@
 from enum import StrEnum, IntEnum
+from boardState.constants import HIGHLIGHTED_BLOCK_IND, EMPTY_CELL_BLOCK_IND, HIGHLIGHTED_BLOCK_CHAR
 import sys
-from boardState.constants import HIGHLIGHTED_BLOCK_IND, EMPTY_CELL_BLOCK_IND
 
 """
 
@@ -21,6 +21,11 @@ Also, this probably won't work for Windows. MacOS and Linux are somewhat similar
 so I expect there will be less problems with that.
 
 """
+
+# If True, then blockIndex is displayed on tiles (last digit only for indexes >= 10)
+IS_DEBUG = False
+# TERMINAL_SCREEN_WIDTH = 80
+# TERMINAL_SCREEN_HEIGHT = 40
 
 class TerminalBgCodes(IntEnum):
     BLACK_NORM = 40,
@@ -54,8 +59,10 @@ def getBlockColorStyle(blockInd) -> str:
         # first eight are bright and last eight are normal, so we subtract difference
         backgroundCode -= (blockInd >= 8) * (100 - 40)
 
-    text = str(origBlockInd)[-1] if origBlockInd != 0 else " "
-    return f"\x1b[1;30;{backgroundCode}m{text}" + TerminalBgStyles.NORMAL
+    text = str(origBlockInd)[-1] if (origBlockInd != 0 and IS_DEBUG) else " "
+    if origBlockInd == HIGHLIGHTED_BLOCK_IND:
+        text = HIGHLIGHTED_BLOCK_CHAR
+    return f"\x1b[1;39;{backgroundCode}m{text}" + TerminalBgStyles.NORMAL
 
 def clearTerminal():
     print("\x1b[2J\x1b[H", end="", flush=True)
