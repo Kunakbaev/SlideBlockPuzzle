@@ -48,12 +48,12 @@ def readExitGatePos(width, height) -> int:
     ind = -1
     while True:
         print(InputPrompts.EXIT_GATE_INPUT_PROMPT, end="")
-        line = input()
-        if len(line.split(' ')) != 2:
+        args = input().split(' ')
+        if len(args) != 2:
             replacePrevLineWithMsg(ReadExitGateFuncErrMsgs.INVALID_NUM_OF_ARGS)
             continue
 
-        sideType, gateIndWord = line.split(' ')
+        sideType, gateIndWord = args
         if not isValidSideType(sideType):
             replacePrevLineWithMsg(ReadExitGateFuncErrMsgs.INVALID_SIDE_TYPE)
             continue
@@ -81,7 +81,6 @@ def readExitGatePos(width, height) -> int:
         else: assert False # actually, we already checked that sideType is valid, but just in case
         break
 
-    print(ind)
     assert ind != -1
     return ind
 
@@ -240,8 +239,6 @@ def readInitialBoardState() -> BoardState:
         if blockReadState == BlockReadState.UNDO_COMMAND:
             if len(historyOfBoards) > 1:
                 # redraw old board
-                # initialBoard.displayBoardState(1, 1)
-                # historyOfBoards[-2].displayBoardState(1, 1)
                 updateBoardImage(initialBoard, historyOfBoards[-2])
                 initialBoard = historyOfBoards[-2]
                 historyOfBoards.pop()

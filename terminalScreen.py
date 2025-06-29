@@ -1,6 +1,7 @@
-from enum import StrEnum, IntEnum
 from boardState.constants import HIGHLIGHTED_BLOCK_IND, EMPTY_CELL_BLOCK_IND, HIGHLIGHTED_BLOCK_CHAR
+from enum import StrEnum, IntEnum
 import sys
+
 
 """
 
@@ -24,13 +25,12 @@ so I expect there will be less problems with that.
 
 # If True, then blockIndex is displayed on tiles (last digit only for indexes >= 10)
 IS_DEBUG = False
-# TERMINAL_SCREEN_WIDTH = 80
-# TERMINAL_SCREEN_HEIGHT = 40
 
 class TerminalBgCodes(IntEnum):
     BLACK_NORM = 40,
     RED_NORM   = 41,
     GREEN_NORM = 42,
+
 
 # background styles (ansi escape sequences) for tiles
 class TerminalBgStyles(StrEnum):
@@ -40,8 +40,8 @@ class TerminalBgStyles(StrEnum):
     BORDER   = f"\x1b[1;39;{TerminalBgCodes.BLACK_NORM}m#\x1b[0m"
     ESC_GATE = " " # bg style for escape gate, it's just "invisible" color
 
+
 def getBlockColorStyle(blockInd) -> str:
-    backgroundCode = 0
     origBlockInd = blockInd
     # we iterate through colors in reverse order,
     # as we want bright and pretty colors to go first
@@ -64,17 +64,22 @@ def getBlockColorStyle(blockInd) -> str:
         text = HIGHLIGHTED_BLOCK_CHAR
     return f"\x1b[1;39;{backgroundCode}m{text}" + TerminalBgStyles.NORMAL
 
+
 def clearTerminal():
     print("\x1b[2J\x1b[H", end="", flush=True)
+
 
 def moveCursorToPos(row, col):
     print(f"\x1b[{row};{col}H", end="", flush=True)
 
+
 def saveCursorPos():
     print("\x1b[s", end="", flush=True)
 
+
 def restoreCursorPos():
     print("\x1b[u", end="", flush=True)
+
 
 # addSep - additional parameter, by default is set to True
 # True  -> adds sep after message equal to ". "

@@ -10,7 +10,6 @@ MAX_BOARD_WIDTH        = 8
 MAX_BOARD_HEIGHT       = 8
 MAX_NUMBER_OF_BLOCKS   = 15 # I have limited amount of ANSI colors (only 16 and black is for empty cells)
 MIN_BLOCK_SIDE_LEN     = 2
-BLOCK_DSNT_FIT_ERR_MSG = "Error: block doesn't fit on the board"
 HIGHLIGHTED_BLOCK_CHAR = '.'
 
 

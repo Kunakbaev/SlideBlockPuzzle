@@ -1,14 +1,19 @@
 from copy import deepcopy
-
-from boardState.boardState import BoardState
-from boardState.constants import EMPTY_CELL_BLOCK_IND
-from enum import Enum
-from collections import deque
 from blockStruct import Block, BlockDirs
-from terminalScreen import clearTerminal, saveCursorPos, restoreCursorPos
+from boardState.constants import EMPTY_CELL_BLOCK_IND
+from collections import deque
+from enum import Enum
 from inputInitialBoardState.inputInitialBoardState import updateBoardImage
+from terminalScreen import clearTerminal, saveCursorPos, restoreCursorPos
 import time
-import curses
+
+
+NUM_OF_BLINKS            = 2
+BLINK_DELAY              = 0.5
+WAIT_FOR_ANY_KEY_MSG     = "Print enter to continue: "
+PUZZLE_IS_SOLVABLE_MSG   = ""
+PUZZLE_IS_UNSOLVABLE_MSG = "Puzzle is unsolvable :(\n"
+
 
 class Directions(Enum):
     Up    = (-1,  0)
@@ -16,19 +21,13 @@ class Directions(Enum):
     Down  = ( 1,  0)
     Left  = ( 0, -1)
 
-# def getDirectionByDeltas(dx, dy) -> (int, int):
-#     for dir in Directions:
-#         if dir.value == (dx, dy):
-#             return dir.name
-#
-#     # unknown direction
-#     assert False
 
 class Move:
     def __init__(self, blockInd, direction, step):
         self.blockInd  = blockInd
         self.direction = direction
         self.step      = step
+
 
 def isBlockIndInCell(board, rowInd, colInd, blockInd) -> bool:
     # if out of board's bound or cell is empty, then there's no block in this cell
@@ -79,7 +78,6 @@ def addNeighbsOfBoardToQueue(
     movStep = 0
     nxtBoard = deepcopy(curBoard)
     row, col = block.rowPos, block.colPos
-    #print(block.blockInd, block.sideLen, row, col)
     while curBoard.isCellPosValid(row + deltaRow, col + deltaCol) and \
           curBoard.board[row + deltaRow][col + deltaCol] == EMPTY_CELL_BLOCK_IND:
         row += deltaRow
@@ -92,9 +90,6 @@ def addNeighbsOfBoardToQueue(
         # if nxtBoard has not been visited
         pushableBoard = deepcopy(nxtBoard)
         if pushableBoard not in previousMove4Board:
-            # previousMove4Board[nxtBoard] = Move(
-            #     block.blockInd, getDirectionByDeltas(dx, dy), movStep
-            # )
             previousMove4Board[pushableBoard] = Move(
                 block.blockInd, (-deltaRow, -deltaCol), movStep
             )
@@ -102,7 +97,7 @@ def addNeighbsOfBoardToQueue(
 
 
 def waitForAnyKey():
-    input("Print enter to continue: ")
+    input(WAIT_FOR_ANY_KEY_MSG)
 
 
 class BoardSolver:
@@ -114,12 +109,10 @@ class BoardSolver:
         self.initialState     = initialState
         self.finalBoardState  = None
 
+
     def findBlocks4Board(self, board):
         blocks = []
         isVisited = [[False for j in range(self.width)] for i in range(self.height)]
-
-        # clearTerminal()
-        # board.displayBoardState()
 
         for row in range(self.height):
             for col in range(self.width):
@@ -137,7 +130,6 @@ class BoardSolver:
                 row2, col2 = markBlockCellsAsVisited(
                     board, blockInd, isVisited
                 )
-                #print(row, col, row2, col2)
                 sideLen = abs(row2 - row) + abs(col2 - col) + 1
                 block = Block(
                     row, col, dir == BlockDirs.HORIZONTAL, sideLen, blockInd
@@ -161,8 +153,6 @@ class BoardSolver:
             for row, col in cells:
                 curBoard.board[row][col] = EMPTY_CELL_BLOCK_IND
 
-            #print(f"row : {rowCop}, col : {colCop}, sideLen : {sideLen}, dir : {dir}, blockInd : {blockInd}, deltaRow : {deltaRow}, deltaCol : {deltaCol}")
-
             deltaRow = move.direction[0] * move.step
             deltaCol = move.direction[1] * move.step
             newBlock = Block(
@@ -171,11 +161,7 @@ class BoardSolver:
                 cells[0][0] == cells[-1][0],
                 len(cells), blockInd
             )
-            # curBoard.displayBoardState()
-            # print(newBlock.blockInd, blockInd)
             assert curBoard.try2AddBlock(newBlock)
-            # curBoard.displayBoardState()
-            # exit(0)
 
         self.boardsHistory.append(deepcopy(self.initialState))
         # reverse the array
@@ -195,9 +181,9 @@ class BoardSolver:
             blockInd = self.movesHistory[i].blockInd
             cells = getCellsInBlock(self.boardsHistory[i], blockInd)
 
-            BLINK_DELAY = 0.5
+            # blink with block that is going to be moved
             time.sleep(BLINK_DELAY)
-            for _ in range(2):
+            for _ in range(NUM_OF_BLINKS):
                 saveCursorPos()
                 for row, col in cells:
                     self.boardsHistory[i].updateCellAndRedrawIt(row, col, EMPTY_CELL_BLOCK_IND)
@@ -226,33 +212,15 @@ class BoardSolver:
         while len(queue):
             curBoard = queue.popleft()
             blocks = self.findBlocks4Board(curBoard)
-            #print("previousMove4Board: ", len(previousMove4Board))
-
-            # curBoard.displayBoardState()
-            # if curBoard != self.initialState:
-            #     continue
 
             if curBoard.isFinalState():
-                print("Successfully solved puzzle! :)")
-                #curBoard.displayBoardState()
+                print(PUZZLE_IS_SOLVABLE_MSG)
                 self.finalBoardState = deepcopy(curBoard)
                 self.restoreHistoryOfBoards(previousMove4Board)
                 break
 
-            # if len(previousMove4Board) > 5:
-            #     bruh = []
-            #     for key, board in previousMove4Board.items():
-            #         print(key, board)
-            #         bruh.append(key)
-            #     bruh[3].displayBoardState()
-            #     bruh[4].displayBoardState()
-            #     print(bruh[3].__hash__(), bruh[4].__hash__(), bruh[3] == bruh[4])
-            #     exit(0)
-
             for block in blocks:
                 deltaRow, deltaCol = (Directions.Left if block.isHorizontal else Directions.Up).value
-                # print(f"blockInd : {block.blockInd}, row : {block.rowPos}, col : {block.colPos}, sideLen : {block.sideLen}")
-                # continue
 
                 addNeighbsOfBoardToQueue(
                     curBoard, block, deltaRow, deltaCol,
@@ -265,7 +233,6 @@ class BoardSolver:
                     curBoard, block, -deltaRow, -deltaCol,
                     previousMove4Board, queue
                 )
-            #exit(0)
         else:
-            print("Puzzle is unsolvable :(\n")
+            print(PUZZLE_IS_UNSOLVABLE_MSG)
             exit(0)

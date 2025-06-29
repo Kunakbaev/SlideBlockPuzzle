@@ -30,6 +30,7 @@ class BoardState:
         self.goalBlockInd        = goalBlockInd
         self.SCALE_FACTOR        = scaleFactor # this field is set once by user and mustn't be modified later
 
+
     def isCellPosValid(self, rowInd, colInd):
         if 0 <= min(rowInd, colInd) and \
            rowInd < self.height     and \
@@ -45,7 +46,8 @@ class BoardState:
             for col in range(self.width):
                 if self.board[row][col] == blockInd:
                     return row, col
-        print("There's no block with such index on the board")
+
+        print("Error: there's no block with such index on the board")
         assert False
         return -1, -1
 
@@ -92,25 +94,19 @@ class BoardState:
 
         gateRow, gateCol = self.getGateIndCellCoords()
         row, col = self.getBlockTopLeftCornerPos(self.goalBlockInd)
-        # print(f"row : {row}, col : {col}, gateRow : {gateRow}, gateCol : {gateCol}")
-        row += 1
-        col += 1
 
-        isStraight = (row == gateRow) or (col == gateCol)
+        isStraight = (row + 1 == gateRow) or (col + 1 == gateCol)
         return isStraight
 
 
     def isFinalState(self) -> bool:
         gateRow, gateCol = self.getGateIndCellCoords()
         row, col = self.getBlockTopLeftCornerPos(self.goalBlockInd)
-        #print(f"row : {row}, col : {col}, gateRow : {gateRow}, gateCol : {gateCol}")
         row += 1
         col += 1
 
         deltaRow, deltaCol = getDirectionBy2Cells(row, col, gateRow, gateCol)
-        #print(deltaRow, deltaCol)
         while self.isCellPosValid(row - 1, col - 1):
-            #print("row, col : ", row, col)
             blockInd = self.board[row - 1][col - 1]
             if blockInd not in (EMPTY_CELL_BLOCK_IND, self.goalBlockInd):
                 return False
@@ -125,7 +121,6 @@ class BoardState:
         # cell is inside board and not on the edge
         if self.isCellPosValid(rowInd - 1, colInd - 1):
             blockInd = int(self.board[rowInd - 1][colInd - 1])
-            # print(rowInd, colInd, blockInd)
             blockColorStyle = getBlockColorStyle(blockInd)
             return blockColorStyle
 
@@ -174,8 +169,8 @@ class BoardState:
         # same for all boards that we can reach from initial one
         # so we just need to hash matrix of strings
 
+        # transform 2d matrix of symbols into array of bytes
         data = dumps(self.board, sort_keys=True).encode("utf-8")
-        # return sha256(data).hexdigest()
         hashBytes = sha256(data).digest()
         # we truncate this number to only 64-bit integer
         hash = int.from_bytes(hashBytes[:8], byteorder="big")

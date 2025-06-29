@@ -58,6 +58,7 @@ class ReadNewBlockFuncErrMsgs(StrEnum):
     BLOCK_LEN_TOO_SMALL  = f"Error: block len is too small, it must be at least {MIN_BLOCK_SIDE_LEN}"
     GOAL_BLOCK_WRONG_DIR = "Error: goal block can't escape through the exit gate"
 
+
 class BlockReadState(Enum):
     NEW_BLOCK_ADDED = 1,
     INPUT_END       = 2,

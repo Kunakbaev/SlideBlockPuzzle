@@ -4,6 +4,7 @@ from terminalScreen import clearTerminal
 
 if __name__ == "__main__":
     clearTerminal()
+
     initialBoardState = readInitialBoardState()
     clearTerminal()
     initialBoardState.displayBoardState()
